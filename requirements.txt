@@ -1,0 +1,6 @@
+wandb
+dill
+tqdm
+opencv-python
+vietocr
+ultralytics==8.0.186
