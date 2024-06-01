@@ -34,11 +34,12 @@ class ConfigLoader:
         return params
 
 class ImageProcessor:
-    def __init__(self, model_name, classes, params, save_dir):
+    def __init__(self, model_name, classes, params, save_dir, device="cpu"):
         self.model = YOLO(model_name, task='detect')
         self.classes = classes
         self.params = params
         self.save_dir = save_dir
+        self.device = device
 
     def process_image(self, img_path):
         results_folder = os.path.join(self.save_dir, os.path.basename(img_path[:-4]))
@@ -61,7 +62,7 @@ class ImageProcessor:
 
         table_box = self._extract_table_box(norm_boxes)
         if table_box:
-            self._process_table(image, table_box, img_path, results_folder)
+            self._process_table(image, table_box, img_path, results_folder, self.device)
         
         self._extract_image_content(image, norm_boxes, img_path, results_folder)
 
@@ -71,7 +72,7 @@ class ImageProcessor:
                 return norm_boxes.pop(i)
         return None
 
-    def _process_table(self, image, table_box, img_path, results_folder):
+    def _process_table(self, image, table_box, img_path, results_folder, device):
         x1, y1, x2, y2 = map(round, table_box[1:5])
         table_img = image[y1:y2, x1:x2]
 
@@ -83,7 +84,7 @@ class ImageProcessor:
         lb_arr = df_table.to_numpy()
 
         config = Cfg.load_config_from_name('vgg_transformer')
-        config['device'] = 'cpu'
+        config['device'] = device
         extractor = Predictor(config)
 
         content_table = self._extract_table_content(lb_arr, transformed_table, extractor)
