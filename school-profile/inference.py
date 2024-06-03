@@ -14,7 +14,7 @@ def main(model_name, img_path, classes_file, params_file, save_dir, device):
         img_folder = os.path.join(save_dir, os.path.basename(img_path)[:-4])
         convert_pdf_to_jpg(img_path, img_folder)
         for img in os.listdir(img_folder):
-            img = os.path.join(img_folder, img)
+            img = os.path.join(img_folder, img, 'img.jpg')
             processor.process_image(img)
 
 if __name__ == "__main__":

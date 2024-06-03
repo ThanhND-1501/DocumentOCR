@@ -11,12 +11,15 @@ from vietocr.tool.predictor import Predictor
 from vietocr.tool.config import Cfg
 
 def convert_pdf_to_jpg(pdf_path, img_folder):
-    img = convert_from_path(pdf_path)
+    os.makedirs(img_folder, exist_ok=True)
+    img = convert_from_path(pdf_path, 350, poppler_path=os.path.join('..' ,'poppler-24.02.0', 'Library', 'bin'))
     if len(img) == 1:
-        img[0].save(f'{os.path.join(img_folder, os.path.basename(pdf_path)[:-4])}.jpg', 'JPEG')
+        img[0].save(f'{os.path.join(img_folder, os.path.basename(pdf_path)[:-4], os.path.basename(pdf_path)[:-4])}.jpg', 'JPEG')
     else:
         for i in range(len(img)):
-            img[i].save(f'{os.path.join(img_folder, os.path.basename(pdf_path)[:-4])}({i}).jpg', 'JPEG')
+            page_folder = os.path.join(img_folder, os.path.basename(pdf_path)[:-4] + '(' + str(i) + ')')
+            os.makedirs(page_folder, exist_ok=True)
+            img[i].save(f"{os.path.join(page_folder, 'img.jpg')}", 'JPEG')
 
 class ConfigLoader:
     @staticmethod
@@ -41,9 +44,13 @@ class ImageProcessor:
         self.save_dir = save_dir
         self.device = device
 
+        # Load the extractor model only once
+        config = Cfg.load_config_from_name('vgg_transformer')
+        config['device'] = self.device
+        self.extractor = Predictor(config)
+
     def process_image(self, img_path):
-        results_folder = os.path.join(self.save_dir, os.path.basename(img_path[:-4]))
-        os.makedirs(results_folder, exist_ok=True)
+        results_folder = os.path.dirname(img_path) # results/test/test(0)
         
         image = cv2.imread(img_path)
         results = self.model(img_path)
@@ -62,7 +69,7 @@ class ImageProcessor:
 
         table_box = self._extract_table_box(norm_boxes)
         if table_box:
-            self._process_table(image, table_box, img_path, results_folder, self.device)
+            self._process_table(image, table_box, img_path, results_folder)
         
         self._extract_image_content(image, norm_boxes, img_path, results_folder)
 
@@ -72,7 +79,7 @@ class ImageProcessor:
                 return norm_boxes.pop(i)
         return None
 
-    def _process_table(self, image, table_box, img_path, results_folder, device):
+    def _process_table(self, image, table_box, img_path, results_folder):
         x1, y1, x2, y2 = map(round, table_box[1:5])
         table_img = image[y1:y2, x1:x2]
 
@@ -80,18 +87,14 @@ class ImageProcessor:
         parameters = self.params[table_type]
 
         detector = TableDetector(parameters)
-        df_table, transformed_table = detector.detect_table_in_image(table_img, results_folder, img_path[:-4]+'_table')
+        df_table, transformed_table = detector.detect_table_in_image(table_img, results_folder, os.path.basename(img_path)[:-4] + '_table')
         lb_arr = df_table.to_numpy()
 
-        config = Cfg.load_config_from_name('vgg_transformer')
-        config['device'] = device
-        extractor = Predictor(config)
-
-        content_table = self._extract_table_content(lb_arr, transformed_table, extractor)
+        content_table = self._extract_table_content(lb_arr, transformed_table)
         df_content_table = pd.DataFrame(content_table)
-        df_content_table.to_csv(os.path.join(results_folder, os.path.basename(img_path)[:-4]+'_content_table.csv'), index=False, header=False)
+        df_content_table.to_csv(os.path.join(results_folder, os.path.basename(img_path)[:-4] + '_content_table.csv'), index=False, header=False)
 
-    def _extract_table_content(self, lb_arr, transformed_table, extractor):
+    def _extract_table_content(self, lb_arr, transformed_table):
         content_table = []
         for row in range(len(lb_arr)):
             row_content = []
@@ -100,35 +103,32 @@ class ImageProcessor:
                     row_content.append(np.nan)
                     continue
                 x, y, w, h = lb_arr[row][col][:4]
-                subimg = transformed_table[y:y+h, x:x+w]
-                content = extractor.predict(Image.fromarray(subimg))
+                subimg = transformed_table[y:y + h, x:x + w]
+                content = self.extractor.predict(Image.fromarray(subimg))
                 row_content.append(content)
             content_table.append(row_content)
         return content_table
 
     def _extract_image_content(self, image, norm_boxes, img_path, results_folder):
         norm_boxes.sort()
-        config = Cfg.load_config_from_name('vgg_transformer')
-        config['device'] = 'cpu'
-        extractor = Predictor(config)
 
         content_image = {}
         for box in norm_boxes:
             field = self.classes[box[0]]
             x1, y1, x2, y2 = map(round, box[1:5])
             tmp_img = image[y1:y2, x1:x2]
-            content = extractor.predict(Image.fromarray(tmp_img))
+            content = self.extractor.predict(Image.fromarray(tmp_img))
             content_image[field] = content
         
         df_content = pd.DataFrame(content_image, index=[0])
-        df_content.to_csv(os.path.join(results_folder, os.path.basename(img_path)[:-4]+'_content.csv'))
+        df_content.to_csv(os.path.join(results_folder, os.path.basename(img_path)[:-4] + '_content.csv'))
 
 class TableDetector:
     def __init__(self, params):
         self.params = params
 
     def preprocess_image(self, img):
-        if img is str:
+        if isinstance(img, str):
             original = cv2.imread(img)
         else:
             original = img
@@ -151,7 +151,7 @@ class TableDetector:
     def get_transformed_image(self, gray_scale, image, rect):
         (tl, tr, br, bl) = rect
         x, y, w, h = cv2.boundingRect(rect)
-        dst = np.array([(x, y), (x+w, y), (x+w, y+h), (x, y+h)], dtype="float32")
+        dst = np.array([(x, y), (x + w, y), (x + w, y + h), (x, y + h)], dtype="float32")
         M = cv2.getPerspectiveTransform(rect, dst)
         warped_gray = cv2.warpPerspective(gray_scale, M, (image.shape[1], image.shape[0]))
         transformed_image = cv2.warpPerspective(image, M, (image.shape[1], image.shape[0]))
@@ -188,9 +188,9 @@ class TableDetector:
         box_list = [
             (x, y, w, h, area)
             for x, y, w, h, area in stats[2:]
-            if area > 100 and h > box_ratio_height * table_height and w > box_ratio_width * table_width and w*h < 0.3*img_bin.shape[0]*img_bin.shape[1]
+            if area > 100 and h > box_ratio_height * table_height and w > box_ratio_width * table_width and w * h < 0.3 * img_bin.shape[0] * img_bin.shape[1]
         ]
-
+        
         return np.array(box_list, dtype=[('x', int), ('y', int), ('w', int), ('h', int), ('area', int)])
 
     def sort_and_norm_boxes(self, box_list):
@@ -239,8 +239,8 @@ class TableDetector:
         return df
 
     def save_table(self, transformed_image, df, output_path):
-        cv2.imwrite(output_path+'.jpg', transformed_image)
-        df.to_csv(output_path+'.csv', index=False, header=False)
+        cv2.imwrite(output_path + '.jpg', transformed_image)
+        df.to_csv(output_path + '.csv', index=False, header=False)
         print('Saved table in', output_path)
 
     def detect_table_in_image(self, img, output_folder, output_table_path):
@@ -262,10 +262,11 @@ class TableDetector:
 
         clone = transformed_image.copy()
         for box in sorted_box_list:
-            cv2.rectangle(clone, (box[0], box[1]), (box[0]+box[2], box[1]+box[3]), (255, 0, 0), 2)
+            cv2.rectangle(clone, (box[0], box[1]), (box[0] + box[2], box[1] + box[3]), (255, 0, 0), 2)
         cv2.imwrite(os.path.join(output_folder, 'table_cells.jpg'), clone)
 
         df_table = self.arrange_boxes(sorted_box_list)
+        print('Output path:', output_table_path)
         self.save_table(transformed_image, df_table, os.path.join(output_folder, output_table_path))
 
         return df_table, transformed_image
