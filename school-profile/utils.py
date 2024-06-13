@@ -14,6 +14,8 @@ def convert_pdf_to_jpg(pdf_path, img_folder):
     os.makedirs(img_folder, exist_ok=True)
     img = convert_from_path(pdf_path, 350, poppler_path=os.path.join('..' ,'poppler-24.02.0', 'Library', 'bin'))
     if len(img) == 1:
+        img_folder = os.path.join(img_folder, os.path.basename(pdf_path)[:-4])
+        os.makedirs(img_folder, exist_ok=True)
         img[0].save(f'{os.path.join(img_folder, os.path.basename(pdf_path)[:-4], os.path.basename(pdf_path)[:-4])}.jpg', 'JPEG')
     else:
         for i in range(len(img)):
