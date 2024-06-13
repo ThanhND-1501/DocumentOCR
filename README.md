@@ -19,3 +19,13 @@ cd school-profile
 
 python inference.py --img_path test.pdf #replace by image put in school-profile
 ```
+
+### Birth Certificate
+
+By CLI
+
+```bash
+cd birth-cert
+
+python inference.py --input_path test.pdf #replace by image put in school-profile
+```
