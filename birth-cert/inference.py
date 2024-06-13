@@ -3,7 +3,9 @@ import os
 from utils import ImageTextDetector, convert_pdf_to_jpg
 
 def main(input_path, savedir, device):
-    if input_path.endswith('.pdf'):
+    if input_path.endswith('.jpg'):
+        os.makedirs(os.path.join(savedir, os.path.basename(input_path)[:-4]))
+    elif input_path.endswith('.pdf'):
         convert_pdf_to_jpg(input_path, savedir)
         input_path = os.path.join(savedir, os.path.basename(input_path)[:-4])
 
