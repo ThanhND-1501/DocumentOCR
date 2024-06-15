@@ -47,10 +47,9 @@ class ImageTextDetector:
         
         dilate = cv2.getStructuringElement(cv2.MORPH_RECT, (55, 10))
         grad = cv2.morphologyEx(blackhat, cv2.MORPH_CLOSE, dilate)
-        thresh = cv2.threshold(grad, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
-        thresh = cv2.erode(thresh, (3, 2), iterations=1)
+        grad = cv2.erode(grad, (3, 2), iterations=1)
         
-        cnts = cv2.findContours(thresh.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+        cnts = cv2.findContours(grad.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
         cnts = imutils.grab_contours(cnts)
         boxes = sort_contours(cnts, method="top-to-bottom")[0]
         
