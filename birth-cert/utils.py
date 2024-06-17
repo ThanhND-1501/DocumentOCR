@@ -46,10 +46,10 @@ class ImageTextDetector:
         blackhat = cv2.morphologyEx(gray, cv2.MORPH_BLACKHAT, blackhatKernel)
         
         dilate = cv2.getStructuringElement(cv2.MORPH_RECT, (55, 10))
-        grad = cv2.morphologyEx(blackhat, cv2.MORPH_CLOSE, dilate)
-        grad = cv2.erode(grad, (3, 2), iterations=1)
+        final = cv2.morphologyEx(blackhat, cv2.MORPH_CLOSE, dilate)
+        final = cv2.erode(final, (3, 2), iterations=1)
         
-        cnts = cv2.findContours(grad.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+        cnts = cv2.findContours(final.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
         cnts = imutils.grab_contours(cnts)
         boxes = sort_contours(cnts, method="top-to-bottom")[0]
         
