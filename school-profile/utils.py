@@ -1,5 +1,6 @@
 import os
 import cv2
+import torch
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -40,7 +41,10 @@ class ConfigLoader:
 
 class ImageProcessor:
     def __init__(self, model_name, classes, params, save_dir, device="cpu"):
-        self.model = YOLO(model_name, task='detect')
+        if model_name == "yolov8":
+            self.model = YOLO("models\yolov8_best_detection_school_profile.pt", task='detect')
+        elif model_name == "yolov5":
+            self.model = torch.hub.load('ultralytics/yolov5','custom', path='/content/drive/MyDrive/Colab Notebooks/OCR/OCR_dataset/HB/Models/best_detection_school_profile.pt')
         self.classes = classes
         self.params = params
         self.save_dir = save_dir

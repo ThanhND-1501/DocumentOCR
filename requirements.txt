@@ -5,4 +5,5 @@ dill
 tqdm
 opencv-python
 vietocr
+torch
 ultralytics==8.0.186
