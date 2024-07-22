@@ -3,6 +3,7 @@ import cv2
 import imutils
 import pandas as pd
 from PIL import Image
+import time
 from imutils.contours import sort_contours
 from pdf2image import convert_from_path
 
@@ -36,6 +37,7 @@ class ImageTextDetector:
         return predictor
 
     def process_image(self, image_path):
+        start = time.time()
         image = cv2.imread(image_path)
         (H, W, _) = image.shape
         resized = cv2.resize(image, (int(2*W), int(2*H)), interpolation=cv2.INTER_LINEAR)
@@ -62,7 +64,7 @@ class ImageTextDetector:
         
         # Sort boxes by rows and then by columns within each row
         boxes_filtered = sorted(boxes_filtered, key=lambda b: (b[1] // 10, b[0]))
-        
+        print('DETECTING TIME:', time.time()-start)
         cropped = []
         pad = 10
         for (x, y, w, h) in boxes_filtered:
@@ -88,13 +90,14 @@ class ImageTextDetector:
     def process_and_save(self, image_path):
         text = self.process_image(image_path)
         image_name = os.path.basename(image_path)
+        print(image_path, image_name)
         csv_path = os.path.join(self.savedir, os.path.splitext(image_name)[0], f'{os.path.splitext(image_name)[0]}.csv')
         df = pd.DataFrame([text])
         df.to_csv(csv_path, index=False)
     
     def run_inference(self):
         if os.path.isdir(self.input_path):
-            files = [f for f in os.listdir(self.input_path) if f.lower().endswith('.jpg')]
+            files = [f for f in os.listdir(self.input_path) if f.lower().endswith('.jpg') and not f.lower().endswith('detected.jpg')]
             for item in files:
                 img_path = os.path.join(self.input_path, item)
                 self.process_and_save(img_path)
